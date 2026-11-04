@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "id": "github",
   "name": "Github",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Полный доступ к одному git-репозиторию GitHub: рабочая копия, чтение файлов и истории, коммиты, ветки, merge/rebase, push (включая force) и произвольные git-команды.",
   "author": {
     "name": "Дмитрий Голдер",

@@ -3,7 +3,7 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     GIT_TERMINAL_PROMPT=0 \
-    GIT_WORKDIR=/tmp/runturu-git
+    GIT_WORKDIR=/tmp/cmcp-github
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git ca-certificates \

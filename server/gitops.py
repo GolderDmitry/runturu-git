@@ -16,7 +16,7 @@ from pathlib import Path
 
 GITHUB_HOST = "github.com"
 SCHEME = "https://"
-ROOT_DIR = Path(os.environ.get("GIT_WORKDIR", "/tmp/runturu-git"))
+ROOT_DIR = Path(os.environ.get("GIT_WORKDIR", "/tmp/cmcp-github"))
 REPO_DIR = ROOT_DIR / "repo"
 HOME_DIR = ROOT_DIR / "home"
 
