@@ -1,0 +1,505 @@
+{
+  "schemaVersion": "1.0",
+  "id": "github",
+  "name": "Github",
+  "version": "1.0.0",
+  "description": "Полный доступ к одному git-репозиторию GitHub: рабочая копия, чтение файлов и истории, коммиты, ветки, merge/rebase, push (включая force) и произвольные git-команды.",
+  "author": {
+    "name": "Дмитрий Голдер",
+    "contact": "dima.golder@gmail.com",
+    "userId": "97b7e11d-6b14-46b7-9e22-5d4ac20333ec"
+  },
+  "license": "MIT",
+  "runtime": {
+    "type": "python",
+    "version": "3.12",
+    "entrypoint": "server/main.py",
+    "port": 8080
+  },
+  "transport": "streamable-http",
+  "healthcheck": {
+    "path": "/health",
+    "timeoutMs": 3000
+  },
+  "configFields": [
+    {
+      "key": "REPO_URL",
+      "label": "Репозиторий GitHub",
+      "type": "url",
+      "scope": "connection",
+      "required": true,
+      "secret": false,
+      "env": "REPO_URL",
+      "help": "github.com/<owner>/<repo> — только GitHub по HTTPS"
+    },
+    {
+      "key": "GIT_TOKEN",
+      "label": "GitHub-токен",
+      "type": "password",
+      "scope": "connection",
+      "required": true,
+      "secret": true,
+      "env": "GIT_TOKEN",
+      "help": "Fine-grained PAT с доступом Contents: Read and write (или классический с областью repo)"
+    },
+    {
+      "key": "DEFAULT_BRANCH",
+      "label": "Ветка по умолчанию",
+      "type": "string",
+      "scope": "connection",
+      "required": false,
+      "secret": false,
+      "default": "main",
+      "env": "DEFAULT_BRANCH"
+    },
+    {
+      "key": "GIT_USER_NAME",
+      "label": "Автор коммитов",
+      "type": "string",
+      "scope": "connection",
+      "required": false,
+      "secret": false,
+      "default": "Runturu Agent",
+      "env": "GIT_USER_NAME"
+    },
+    {
+      "key": "GIT_USER_EMAIL",
+      "label": "Почта автора коммитов",
+      "type": "string",
+      "scope": "connection",
+      "required": false,
+      "secret": false,
+      "default": "agent@runturu.com",
+      "env": "GIT_USER_EMAIL"
+    }
+  ],
+  "tools": [
+    {
+      "name": "repo_info",
+      "description": "Состояние рабочей копии: ветка, HEAD, изменения, размер, remote.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "list_files",
+      "description": "Список файлов: в рабочей копии или в произвольной ревизии (ref).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Подкаталог или префикс пути"
+          },
+          "ref": {
+            "type": "string",
+            "description": "Ветка, тег или коммит; пусто — рабочая копия"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Максимум файлов в ответе",
+            "default": 500
+          }
+        }
+      }
+    },
+    {
+      "name": "read_file",
+      "description": "Прочитать файл из рабочей копии или из ревизии (ref).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Путь файла относительно корня репозитория"
+          },
+          "ref": {
+            "type": "string",
+            "description": "Ветка, тег или коммит; пусто — рабочая копия"
+          }
+        },
+        "required": ["path"]
+      }
+    },
+    {
+      "name": "git_log",
+      "description": "История коммитов: ref — ветка/тег, path — только по файлу.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "default": 20
+          },
+          "ref": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "git_diff",
+      "description": "Разница: рабочая копия ↔ HEAD, между ревизиями или только staged.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from_ref": {
+            "type": "string",
+            "default": "HEAD"
+          },
+          "to_ref": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "staged": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "git_show",
+      "description": "Показать коммит целиком или файл в ревизии.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "default": "HEAD"
+          },
+          "path": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "git_blame",
+      "description": "Авторство строк файла.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          }
+        },
+        "required": ["path"]
+      }
+    },
+    {
+      "name": "list_branches",
+      "description": "Локальные и удалённые ветки.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "remote": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    {
+      "name": "list_tags",
+      "description": "Теги репозитория.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "write_file",
+      "description": "Создать или перезаписать файл в рабочей копии (без коммита).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "create_dirs": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": ["path", "content"]
+      }
+    },
+    {
+      "name": "delete_file",
+      "description": "Удалить файл из рабочей копии (без коммита).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": ["path"]
+      }
+    },
+    {
+      "name": "commit",
+      "description": "Закоммитить изменения: конкретные пути или все (all=true).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "all": {
+            "type": "boolean",
+            "default": true
+          },
+          "amend": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": ["message"]
+      }
+    },
+    {
+      "name": "push",
+      "description": "Отправить ветку в origin. force — --force-with-lease.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "force": {
+            "type": "boolean",
+            "default": false
+          },
+          "tags": {
+            "type": "boolean",
+            "default": false
+          },
+          "dry_run": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "repo_sync",
+      "description": "Забрать изменения из origin (fetch + pull).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "rebase": {
+            "type": "boolean",
+            "default": false
+          },
+          "prune": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    {
+      "name": "create_branch",
+      "description": "Создать ветку (по умолчанию от текущего HEAD).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "from_ref": {
+            "type": "string"
+          },
+          "checkout": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": ["name"]
+      }
+    },
+    {
+      "name": "checkout",
+      "description": "Переключиться на ветку/тег/коммит; create=true — создать ветку.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "create": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": ["ref"]
+      }
+    },
+    {
+      "name": "delete_branch",
+      "description": "Удалить ветку локально и/или в origin.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "remote": {
+            "type": "boolean",
+            "default": false
+          },
+          "force": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": ["name"]
+      }
+    },
+    {
+      "name": "reset",
+      "description": "Переместить ветку на ref: mode = soft | mixed | hard.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "default": "HEAD"
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["soft", "mixed", "hard"],
+            "default": "hard"
+          }
+        }
+      }
+    },
+    {
+      "name": "merge",
+      "description": "Слить ref в текущую ветку.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "no_ff": {
+            "type": "boolean",
+            "default": false
+          },
+          "ff_only": {
+            "type": "boolean",
+            "default": false
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["ref"]
+      }
+    },
+    {
+      "name": "rebase",
+      "description": "Rebase текущей ветки на onto; action = start | continue | abort | skip.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "onto": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": ["start", "continue", "abort", "skip"],
+            "default": "start"
+          }
+        }
+      }
+    },
+    {
+      "name": "tag",
+      "description": "Теги: list | create | delete.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": ["list", "create", "delete"],
+            "default": "list"
+          },
+          "ref": {
+            "type": "string",
+            "default": "HEAD"
+          },
+          "message": {
+            "type": "string"
+          },
+          "push_tag": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "run_git",
+      "description": "Произвольная git-команда: аргументы без слова git (полный доступ).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "timeout": {
+            "type": "integer",
+            "default": 120
+          }
+        },
+        "required": ["args"]
+      }
+    },
+    {
+      "name": "workspace_reset",
+      "description": "Пересоздать рабочую копию с нуля. Несохранённые изменения теряются.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "confirm": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": ["confirm"]
+      }
+    }
+  ],
+  "permissions": {
+    "network": ["github.com"],
+    "filesystem": "tmp"
+  }
+}
