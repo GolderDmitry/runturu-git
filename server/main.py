@@ -10,6 +10,9 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
+import urllib.error
+import urllib.request
 from contextvars import ContextVar
 from typing import Any
 
@@ -555,6 +558,114 @@ def workspace_reset(confirm: bool = False) -> dict:
         "branch": gitops.current_branch(token) or branch,
         "head": _run(["rev-parse", "--short", "HEAD"], token=token, check=False).strip(),
         "reset": True,
+    }
+
+
+
+# ─────────────────────── GitHub API: pull requests ───────────────────────
+
+
+def _repo_parts() -> tuple[str, str]:
+    url = _cfg("REPO_URL")
+    match = re.search(r"github\.com[:/]+([^/]+)/([^/]+?)(?:\.git)?/?$", url)
+    if not match:
+        raise RuntimeError("REPO_URL должен быть github.com/<owner>/<repo>")
+    return match.group(1), match.group(2)
+
+
+def _github(method: str, path: str, payload: dict | None = None) -> Any:
+    token = _cfg("GIT_TOKEN")
+    if not token:
+        raise RuntimeError("Не задан GIT_TOKEN")
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    request = urllib.request.Request(
+        "https://api.github.com" + path,
+        data=data,
+        method=method,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json",
+            "User-Agent": "runturu-github-cmcp/1.1",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=25) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", "replace")[:300]
+        raise RuntimeError(f"GitHub {exc.code}: {detail}") from exc
+
+
+@mcp.tool()
+def pr_list(state: str = "open", limit: int = 20) -> dict:
+    """Список pull request'ов репозитория (state: open|closed|all)."""
+    owner, repo = _repo_parts()
+    items = _github("GET", f"/repos/{owner}/{repo}/pulls?state={state}&per_page={min(max(limit, 1), 50)}")
+    return {
+        "items": [
+            {
+                "number": item.get("number"),
+                "title": item.get("title"),
+                "state": item.get("state"),
+                "user": (item.get("user") or {}).get("login"),
+                "head": (item.get("head") or {}).get("ref"),
+                "base": (item.get("base") or {}).get("ref"),
+                "url": item.get("html_url"),
+            }
+            for item in items
+        ]
+    }
+
+
+@mcp.tool()
+def pr_comments(pr_number: int) -> dict:
+    """Комментарии pull request'а: обычные и review-комментарии к коду."""
+    owner, repo = _repo_parts()
+    issue_comments = _github("GET", f"/repos/{owner}/{repo}/issues/{pr_number}/comments?per_page=50")
+    review_comments = _github("GET", f"/repos/{owner}/{repo}/pulls/{pr_number}/comments?per_page=50")
+    return {
+        "comments": [
+            {
+                "kind": "issue",
+                "id": item.get("id"),
+                "user": (item.get("user") or {}).get("login"),
+                "created_at": item.get("created_at"),
+                "body": item.get("body"),
+            }
+            for item in issue_comments
+        ]
+        + [
+            {
+                "kind": "review",
+                "id": item.get("id"),
+                "user": (item.get("user") or {}).get("login"),
+                "created_at": item.get("created_at"),
+                "path": item.get("path"),
+                "line": item.get("line") or item.get("original_line"),
+                "body": item.get("body"),
+            }
+            for item in review_comments
+        ]
+    }
+
+
+@mcp.tool()
+def pr_comment(pr_number: int, body: str) -> dict:
+    """Оставить комментарий в pull request от имени владельца токена."""
+    text = (body or "").strip()
+    if len(text) < 2:
+        raise RuntimeError("Пустой комментарий")
+    owner, repo = _repo_parts()
+    result = _github(
+        "POST",
+        f"/repos/{owner}/{repo}/issues/{pr_number}/comments",
+        {"body": text[:60000]},
+    )
+    return {
+        "id": result.get("id"),
+        "url": result.get("html_url"),
+        "created_at": result.get("created_at"),
     }
 
 
