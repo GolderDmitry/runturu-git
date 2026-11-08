@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "id": "github",
   "name": "Github",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Полный доступ к одному git-репозиторию GitHub: рабочая копия, чтение файлов и истории, коммиты, ветки, merge/rebase, push (включая force) и произвольные git-команды.",
   "author": {
     "name": "Дмитрий Голдер",
@@ -580,6 +580,50 @@
         },
         "required": [
           "pr_number",
+          "body"
+        ]
+      }
+    },
+    {
+      "name": "commit_comment",
+      "description": "Комментарий к коммиту — работает без pull request.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sha": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sha",
+          "body"
+        ]
+      }
+    },
+    {
+      "name": "issue_create",
+      "description": "Создать issue с отчётом ревью.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "title",
           "body"
         ]
       }

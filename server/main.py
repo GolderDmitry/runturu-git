@@ -669,6 +669,47 @@ def pr_comment(pr_number: int, body: str) -> dict:
     }
 
 
+
+@mcp.tool()
+def commit_comment(sha: str, body: str) -> dict:
+    """Комментарий к коммиту — работает без pull request."""
+    text = (body or "").strip()
+    commit = (sha or "").strip()
+    if len(text) < 2:
+        raise RuntimeError("Пустой комментарий")
+    if len(commit) < 7:
+        raise RuntimeError("Нужен SHA коммита (7+ символов)")
+    owner, repo = _repo_parts()
+    result = _github(
+        "POST",
+        f"/repos/{owner}/{repo}/commits/{commit}/comments",
+        {"body": text[:60000]},
+    )
+    return {"id": result.get("id"), "url": result.get("html_url"), "created_at": result.get("created_at")}
+
+
+@mcp.tool()
+def issue_create(title: str, body: str, labels: list[str] | None = None) -> dict:
+    """Создать issue с отчётом ревью."""
+    name = (title or "").strip()
+    text = (body or "").strip()
+    if len(name) < 3:
+        raise RuntimeError("Слишком короткий заголовок issue")
+    if len(text) < 5:
+        raise RuntimeError("Слишком короткое тело issue")
+    owner, repo = _repo_parts()
+    payload: dict[str, Any] = {"title": name[:250], "body": text[:60000]}
+    if labels:
+        payload["labels"] = [str(item)[:50] for item in labels][:10]
+    result = _github("POST", f"/repos/{owner}/{repo}/issues", payload)
+    return {
+        "number": result.get("number"),
+        "url": result.get("html_url"),
+        "state": result.get("state"),
+        "created_at": result.get("created_at"),
+    }
+
+
 # ─────────────────────────── Приложение ───────────────────────────
 
 
