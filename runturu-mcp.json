@@ -2,8 +2,8 @@
   "schemaVersion": "1.0",
   "id": "github",
   "name": "Github",
-  "version": "1.2.0",
-  "description": "Полный доступ к одному git-репозиторию GitHub: рабочая копия, чтение файлов и истории, коммиты, ветки, merge/rebase, push (включая force) и произвольные git-команды.",
+  "version": "1.3.0",
+  "description": "Полный доступ к одному git-репозиторию GitHub: рабочая копия, чтение файлов и истории, коммиты, ветки, merge/rebase, push (включая force), произвольные git-команды и полноценная работа с pull request: создание, изменение, слияние, ревью с замечаниями к строкам, CI-проверки и метки.",
   "author": {
     "name": "Дмитрий Голдер",
     "contact": "dima.golder@gmail.com",
@@ -581,6 +581,351 @@
         "required": [
           "pr_number",
           "body"
+        ]
+      }
+    },
+    {
+      "name": "pr_get",
+      "description": "Детали pull request'а: состояние, draft, mergeable, ветки, статистика, ревьюеры.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pr_number": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pr_number"
+        ]
+      }
+    },
+    {
+      "name": "pr_files",
+      "description": "Файлы, изменённые в pull request'е: статус, строки, patch (обрезается).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pr_number": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 100
+          }
+        },
+        "required": [
+          "pr_number"
+        ]
+      }
+    },
+    {
+      "name": "pr_commits",
+      "description": "Коммиты pull request'а: SHA, первая строка сообщения, автор, дата.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pr_number": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 50
+          }
+        },
+        "required": [
+          "pr_number"
+        ]
+      }
+    },
+    {
+      "name": "pr_reviews",
+      "description": "Отзывы pull request'а: APPROVED, CHANGES_REQUESTED, COMMENTED и их авторы.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pr_number": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pr_number"
+        ]
+      }
+    },
+    {
+      "name": "pr_checks",
+      "description": "Проверки CI pull request'а: общий статус, статусы и check-runs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pr_number": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pr_number"
+        ]
+      }
+    },
+    {
+      "name": "pr_create",
+      "description": "Создать pull request: head — ветка-источник, base — целевая (по умолчанию DEFAULT_BRANCH).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "head": {
+            "type": "string"
+          },
+          "base": {
+            "type": "string",
+            "default": ""
+          },
+          "body": {
+            "type": "string",
+            "default": ""
+          },
+          "draft": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "title",
+          "head"
+        ]
+      }
+    },
+    {
+      "name": "pr_update",
+      "description": "Изменить PR: заголовок, описание, целевую ветку или состояние (open|closed).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pr_number": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "base": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "pr_number"
+        ]
+      }
+    },
+    {
+      "name": "pr_merge",
+      "description": "Слить PR: method = merge | squash | rebase; delete_branch удаляет head-ветку после слияния.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pr_number": {
+            "type": "integer"
+          },
+          "method": {
+            "type": "string",
+            "default": "merge"
+          },
+          "commit_title": {
+            "type": "string",
+            "default": ""
+          },
+          "commit_message": {
+            "type": "string",
+            "default": ""
+          },
+          "sha": {
+            "type": "string",
+            "default": ""
+          },
+          "delete_branch": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "pr_number"
+        ]
+      }
+    },
+    {
+      "name": "pr_review",
+      "description": "Отзыв на PR: event = APPROVE | REQUEST_CHANGES | COMMENT, comments — замечания к строкам ({path, line|position, body, side?}).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pr_number": {
+            "type": "integer"
+          },
+          "event": {
+            "type": "string",
+            "default": "COMMENT"
+          },
+          "body": {
+            "type": "string",
+            "default": ""
+          },
+          "commit_id": {
+            "type": "string",
+            "default": ""
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "line": {
+                  "type": "integer"
+                },
+                "position": {
+                  "type": "integer"
+                },
+                "side": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "start_line": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "path",
+                "body"
+              ]
+            }
+          }
+        },
+        "required": [
+          "pr_number"
+        ]
+      }
+    },
+    {
+      "name": "pr_review_comment",
+      "description": "Комментарий к строке файла в PR; commit_id по умолчанию — head PR.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pr_number": {
+            "type": "integer"
+          },
+          "body": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          },
+          "side": {
+            "type": "string",
+            "default": "RIGHT"
+          },
+          "commit_id": {
+            "type": "string",
+            "default": ""
+          },
+          "start_line": {
+            "type": "integer",
+            "default": 0
+          }
+        },
+        "required": [
+          "pr_number",
+          "body",
+          "path",
+          "line"
+        ]
+      }
+    },
+    {
+      "name": "pr_request_reviewers",
+      "description": "Запросить ревью у пользователей и/или команд.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pr_number": {
+            "type": "integer"
+          },
+          "reviewers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "teams": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "pr_number"
+        ]
+      }
+    },
+    {
+      "name": "pr_draft",
+      "description": "Перевести PR в draft или вернуть в готовые к ревью (GitHub GraphQL).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pr_number": {
+            "type": "integer"
+          },
+          "draft": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "pr_number"
+        ]
+      }
+    },
+    {
+      "name": "pr_labels",
+      "description": "Метки PR: без аргументов — список; add/remove — добавить и снять метки.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pr_number": {
+            "type": "integer"
+          },
+          "add": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "remove": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "pr_number"
         ]
       }
     },
