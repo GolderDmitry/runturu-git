@@ -17,20 +17,49 @@ MCP-сервер Runturu с **полным доступом к одному git-
 | Ключ | Тип | Обязательно | Что это |
 | --- | --- | --- | --- |
 | `REPO_URL` | url | да | `https://github.com/<owner>/<repo>` — только HTTPS и только GitHub |
-| `GIT_TOKEN` | password | да | GitHub PAT с доступом к содержимому репозитория |
+| `GIT_TOKEN` | password | да | GitHub PAT: contents, pull requests, issues (см. раздел о правах ниже) |
 | `DEFAULT_BRANCH` | string | нет | ветка при первом клонировании, по умолчанию `main` |
 | `GIT_USER_NAME` | string | нет | автор коммитов, по умолчанию `Runturu Agent` |
 | `GIT_USER_EMAIL` | string | нет | почта автора коммитов, по умолчанию `agent@runturu.com` |
 
-Токен нужен с правами **Contents: Read and write** (fine-grained PAT) или
-классический с областью `repo`. Для работы с pull request дополнительно:
+Токен нужен с доступом к выбранному репозиторию и правами на запись, если
+агент будет коммитить, пушить, сливать PR или оставлять отзывы.
 
-- **Pull requests: Read and write** — создание, изменение, слияние, ревью;
-- **Issues: Read and write** — комментарии и метки PR;
-- **Checks: Read** — `pr_checks` (для приватных репозиториев);
-- **Contents: Write** — удаление head-ветки после слияния (`delete_branch`).
+### Fine-grained PAT (рекомендуется)
 
-Только чтение — достаточно `Contents: Read` и `Pull requests: Read`.
+При создании токена выберите **Only select repositories** и нужный репозиторий
+(иначе GitHub отвечает `404`, а не `403`). Repository permissions:
+
+| Разрешение | Уровень | Зачем |
+| --- | --- | --- |
+| **Contents** | Read and write | clone/fetch/push, ветки и коммиты, слияние PR (`PUT /pulls/{n}/merge` требует Contents: write), удаление head-ветки |
+| **Pull requests** | Read and write | список/детали/файлы/коммиты/отзывы; создание, изменение и закрытие PR, ревью, комментарии к строкам, запрос ревьюеров, draft ↔ ready |
+| **Issues** | Read and write | `pr_comment` (обсуждение PR), `pr_labels`, `issue_create` |
+| **Commit statuses** | Read | `pr_checks`: общий CI-статус коммита |
+| **Metadata** | Read | обязательное, GitHub добавляет сам |
+| **Workflows** | Read and write | только если агент пушит изменения в `.github/workflows/` |
+
+Важно: **Checks: Read в fine-grained PAT нет**. GitHub отдаёт `check-runs`
+только токенам GitHub App и классическим PAT с `repo`. Поэтому с fine-grained
+токеном `pr_checks` вернёт combined statuses, а `check_runs` будет пустым,
+с текстом ошибки в `errors[]`. Для полного CI (check-runs) нужен classic PAT.
+
+Чисто на чтение (агент только смотрит PR, ничего не пишет): `Contents: Read`,
+`Pull requests: Read`, `Issues: Read`, `Commit statuses: Read` — этого хватит
+для `repo_info`/`pr_list`/`pr_get`/`pr_files`/`pr_checks`, но не для ревью и
+комментариев.
+
+### Classic PAT
+
+| Scope | Зачем |
+| --- | --- |
+| `repo` | всё: содержимое, ветки, PR, issues, комментарии, статусы, check-runs, merge |
+| `workflow` | если агент меняет файлы `.github/workflows/` (без него git push таких файлов отклоняется) |
+| `public_repo` | только публичные репозитории, если приватные не нужны |
+
+Токен должен принадлежать пользователю с правом записи в репозиторий. Для
+организаций fine-grained PAT может требовать одобрения владельца организации.
+Ставьте срок действия и выдавайте отдельный токен на репозиторий.
 
 ## Инструменты
 

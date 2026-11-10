@@ -40,7 +40,7 @@
       "required": true,
       "secret": true,
       "env": "GIT_TOKEN",
-      "help": "Fine-grained PAT с доступом Contents: Read and write (или классический с областью repo)"
+      "help": "PAT: Contents R/W, Pull requests R/W, Issues R/W, Commit statuses Read (fine-grained) или classic с областью repo; для check-runs нужен classic repo"
     },
     {
       "key": "DEFAULT_BRANCH",
